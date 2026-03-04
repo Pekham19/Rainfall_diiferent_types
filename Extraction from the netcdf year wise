@@ -1,0 +1,54 @@
+import os
+import xarray as xr
+import rioxarray
+
+# ----------------------------------
+# 1. Input NetCDF file
+# ----------------------------------
+nc_file = r".nc"
+
+# ----------------------------------
+# 2. Output folder
+# ----------------------------------
+output_folder = r"_"
+os.makedirs(output_folder, exist_ok=True)
+
+# ----------------------------------
+# 3. Open dataset
+# ----------------------------------
+ds = xr.open_dataset(nc_file)
+
+print("Dataset structure:")
+print(ds)
+
+# ----------------------------------
+# 4. Select precipitation variable
+# ----------------------------------
+variable_name = "Variable name of that particular type of tiff"   # change if different Check using arc or qgis
+data = ds[variable_name]
+
+# ----------------------------------
+# 5. Set CRS ( lat/lon WGS84)
+# ----------------------------------
+data = data.rio.write_crs("EPSG:4326") ## Projection is Important so always create the projection
+
+# ----------------------------------
+# 6. Export each day as GeoTIFF
+# ----------------------------------
+for i in range(len(data.time)):
+    
+    single_day = data.isel(time=i)
+    
+    # Format date
+    date_str = str(single_day.time.values)[:10]
+    
+    output_path = os.path.join(
+        output_folder,
+        f"Name of your data_2023_{date_str}.tif"
+    )
+    
+    single_day.rio.to_raster(output_path)
+    
+    print(f"Saved: {output_path}")
+
+print(" TIFFs exported successfully!")
