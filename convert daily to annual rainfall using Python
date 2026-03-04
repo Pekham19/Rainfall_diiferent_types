@@ -1,0 +1,65 @@
+import os
+import glob
+import rasterio
+import numpy as np
+
+# ---------------------------------------------------
+# 1. Base Directory (where all yearly folders exist)
+# ---------------------------------------------------
+base_dir = r"_Folder there the tiff files are exits"
+
+# ---------------------------------------------------
+# 2. Output Folder for Annual Rainfall Maps
+# ---------------------------------------------------
+output_dir = os.path.join(base_dir, "Annual_Rainfall_Maps")
+os.makedirs(output_dir, exist_ok=True)
+
+# ---------------------------------------------------
+# 3. Loop Through Years (1991–2023)
+# ---------------------------------------------------
+for year in range(1991, 2024):
+    
+    print(f"\nProcessing Year: {year}")
+    
+    year_folder = os.path.join(base_dir, f"Name of your datasets_{year}_TIFFS")
+    
+    if not os.path.exists(year_folder):
+        print(f"Folder not found for {year}, skipping...")
+        continue
+    
+    tif_files = sorted(glob.glob(os.path.join(year_folder, "*.tif")))
+    
+    if len(tif_files) == 0:
+        print(f"No TIFF files found for {year}, skipping...")
+        continue
+    
+    print(f"Total daily files: {len(tif_files)}")
+    
+    # Read first file for metadata
+    with rasterio.open(tif_files[0]) as src:
+        meta = src.meta.copy()
+        annual_sum = np.zeros((src.height, src.width), dtype=np.float32)
+    
+    # Sum daily rainfall
+    for file in tif_files:
+        with rasterio.open(file) as src:
+            data = src.read(1)
+            
+            # Replace nodata with 0
+            if src.nodata is not None:
+                data = np.where(data == src.nodata, 0, data)
+            
+            annual_sum += data
+    
+    # Update metadata
+    meta.update(dtype=rasterio.float32)
+    
+    # Save output
+    output_file = os.path.join(output_dir, f"Annual_Rainfall_{year}.tif")
+    
+    with rasterio.open(output_file, "w", **meta) as dst:
+        dst.write(annual_sum.astype(rasterio.float32), 1)
+    
+    print(f"Saved: {output_file}")
+
+print("\n✅ All years processed successfully!")
