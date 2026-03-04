@@ -1,0 +1,96 @@
+import os
+import glob
+import rasterio
+import numpy as np
+
+# ---------------------------------------------------
+# 1. Directory where Annual Rainfall Maps are stored
+# ---------------------------------------------------
+annual_dir = r"Annual_Rainfall_Maps"
+
+# ---------------------------------------------------
+# 2. Output Directory for Decadal Maps
+# ---------------------------------------------------
+output_dir = os.path.join(annual_dir, "Decadal_Mean_Maps")
+os.makedirs(output_dir, exist_ok=True)
+
+# ---------------------------------------------------
+# 3. Define Decades What in your maps
+# ---------------------------------------------------
+decades = [
+    (1993, 2003),
+    (2003, 2013),
+    (2013, 2023),
+]
+
+# ---------------------------------------------------
+# 4. Loop Through Each Decade
+# ---------------------------------------------------
+for start_year, end_year in decades:
+    
+    print(f"\nProcessing Decade: {start_year}-{end_year}")
+    
+    files = []
+    for year in range(start_year, end_year + 1):
+        file_path = os.path.join(annual_dir, f"Annual_Rainfall_{year}.tif")
+        if os.path.exists(file_path):
+            files.append(file_path)
+    
+    if len(files) == 0:
+        print("No files found for this decade.")
+        continue
+    
+    print(f"Number of annual rasters used: {len(files)}")
+    
+    # Read first file for metadata
+    with rasterio.open(files[0]) as src:
+        meta = src.meta.copy()
+        decade_sum = np.zeros((src.height, src.width), dtype=np.float32)
+    
+    # Sum annual rasters
+    for file in files:
+        with rasterio.open(file) as src:
+            data = src.read(1)
+            decade_sum += data
+    
+    # Calculate mean
+    decade_mean = decade_sum / len(files)
+    
+    # Update metadata
+    meta.update(dtype=rasterio.float32)
+    
+    # Save output
+    output_file = os.path.join(output_dir, 
+                               f"Decadal_Mean_{start_year}_{end_year}.tif")
+    
+    with rasterio.open(output_file, "w", **meta) as dst:
+        dst.write(decade_mean.astype(rasterio.float32), 1)
+    
+    print(f"Saved: {output_file}")
+
+# ---------------------------------------------------
+## 5. Long-Term Mean (1991–2023)
+# ---------------------------------------------------
+print("\nProcessing Long-Term Mean (1991–2023)")
+
+all_files = glob.glob(os.path.join(annual_dir, "Annual_Rainfall_*.tif"))
+
+with rasterio.open(all_files[0]) as src:
+    meta = src.meta.copy()
+    total_sum = np.zeros((src.height, src.width), dtype=np.float32)
+
+for file in all_files:
+    with rasterio.open(file) as src:
+        data = src.read(1)
+        total_sum += data
+
+long_term_mean = total_sum / len(all_files)
+
+meta.update(dtype=rasterio.float32)
+
+output_file = os.path.join(output_dir, "Long_Term_Mean_1991_2023.tif")
+
+with rasterio.open(output_file, "w", **meta) as dst:
+    dst.write(long_term_mean.astype(rasterio.float32), 1)
+
+print("✅ All Decadal Maps Created Successfully!")
