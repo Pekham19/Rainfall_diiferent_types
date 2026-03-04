@@ -1,0 +1,44 @@
+import os
+import glob
+import rasterio
+import numpy as np
+
+base_dir = r"_data"
+output_dir = os.path.join(base_dir, "Annual_Max_Intensity")
+os.makedirs(output_dir, exist_ok=True)
+
+for year in range(1991, 2024):
+    
+    print(f"\nProcessing Max Intensity for {year}")
+    
+    year_folder = os.path.join(base_dir, f"Name of your data_{year}_TIFFS")
+    
+    if not os.path.exists(year_folder):
+        print("Folder not found, skipping...")
+        continue
+    
+    tif_files = sorted(glob.glob(os.path.join(year_folder, "*.tif")))
+    
+    if len(tif_files) == 0:
+        print("No TIFF files found.")
+        continue
+    
+    with rasterio.open(tif_files[0]) as src:
+        meta = src.meta.copy()
+        max_rain = src.read(1).astype(np.float32)
+    
+    for file in tif_files[1:]:
+        with rasterio.open(file) as src:
+            data = src.read(1).astype(np.float32)
+            max_rain = np.maximum(max_rain, data)
+    
+    meta.update(dtype=rasterio.float32)
+    
+    output_file = os.path.join(output_dir, f"Max_Daily_Rainfall_{year}.tif")
+    
+    with rasterio.open(output_file, "w", **meta) as dst:
+        dst.write(max_rain, 1)
+    
+    print(f"Saved: {output_file}")
+
+print("\n✅ Annual Intensity Maps Created Successfully!")
